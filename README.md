@@ -8,13 +8,13 @@ Free crypto grid trading calculator for Binance Futures traders.
 - React 19
 - TypeScript (strict)
 - Tailwind CSS 4
-- Upstash Redis (public visit counter)
+- Vercel Analytics
 
 ## Getting Started
 
 ```bash
 npm install
-cp .env.example .env.local   # optional — for counter & SEO locally
+cp .env.example .env.local   # optional — for SEO locally
 npm run dev
 ```
 
@@ -26,7 +26,7 @@ Open [http://localhost:3000](http://localhost:3000).
 - Long, Short, Neutral strategies
 - Profit per grid, margin, liquidation simulation
 - Coin holdings simulation at Start / Upper / Lower / Current
-- Public visit counter in footer
+- Visitor analytics via Vercel Analytics dashboard
 
 ## Environment Variables
 
@@ -35,10 +35,8 @@ Copy [`.env.example`](.env.example) to `.env.local` for local dev.
 | Variable | Required | Purpose |
 |----------|----------|---------|
 | `NEXT_PUBLIC_SITE_URL` | Recommended | Canonical URL for sitemap, OpenGraph, and SEO |
-| `UPSTASH_REDIS_REST_URL` | For counter | Upstash Redis REST endpoint |
-| `UPSTASH_REDIS_REST_TOKEN` | For counter | Upstash Redis REST token |
 
-The calculator works without env vars. The visit counter and production SEO metadata need them on Vercel.
+The calculator works without env vars. Production SEO metadata works best when `NEXT_PUBLIC_SITE_URL` is set on Vercel.
 
 ## Deploy (Vercel)
 
@@ -54,9 +52,8 @@ Repo: [github.com/borbaibank/Girdcalculator](https://github.com/borbaibank/Girdc
    - **Build Command:** `npm run build`
    - **Output Directory:** (auto)
    - **Install Command:** `npm install`
-5. Add environment variables (see below)
-6. Click **Deploy**
-7. Wait ~2 minutes — you get a URL like `https://girdcalculator.vercel.app`
+5. Click **Deploy**
+6. Wait ~2 minutes — you get a URL like `https://girdcalculator.vercel.app`
 
 ### Auto-deploy on push
 
@@ -77,17 +74,15 @@ In **Project → Settings → Environment Variables**, add:
 | Name | Example | Environments |
 |------|---------|--------------|
 | `NEXT_PUBLIC_SITE_URL` | `https://girdcalculator.vercel.app` | Production |
-| `UPSTASH_REDIS_REST_URL` | from Upstash dashboard | Production, Preview |
-| `UPSTASH_REDIS_REST_TOKEN` | from Upstash dashboard | Production, Preview |
 
-Redeploy after adding env vars (or push a new commit).
+### Vercel Analytics (page views)
 
-### Visit counter setup (Upstash)
+1. Vercel → your project → **Analytics** tab
+2. Click **Enable** (free Hobby plan)
+3. After deploy, open **Analytics** to see visitors, page views, countries, and devices
+4. Data may take 30 minutes to 24 hours to appear after the first visits
 
-1. Create a free account at [upstash.com](https://upstash.com)
-2. **Create Redis database** — region `ap-southeast-1` (matches Vercel `sin1`)
-3. Copy **REST URL** and **REST Token** into Vercel env vars above
-4. Redeploy — footer shows e.g. `1,234 visits`
+No extra env vars or third-party accounts required.
 
 ### Google Search (SEO)
 
@@ -113,7 +108,7 @@ npm run start
 
 ```
 src/
-├── app/                    # Pages, API routes, sitemap, robots
+├── app/                    # Pages, sitemap, robots
 ├── components/             # Shared UI & layout
 ├── features/grid-calculator/
 ├── lib/calculators/grid.ts
