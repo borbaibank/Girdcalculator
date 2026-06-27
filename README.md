@@ -40,20 +40,20 @@ The calculator works without env vars. On Vercel, SEO metadata, `sitemap.xml`, a
 
 ## Deploy (Vercel)
 
-Repo: [github.com/borbaibank/Girdcalculator](https://github.com/borbaibank/Girdcalculator)
+Repo: [github.com/borbaibank/Gridcalculator](https://github.com/borbaibank/Gridcalculator)
 
 ### One-time setup
 
 1. Go to [vercel.com](https://vercel.com) and sign in with **GitHub**
 2. Click **Add New… → Project**
-3. Import **borbaibank/Girdcalculator**
+3. Import **borbaibank/Gridcalculator**
 4. Keep default settings:
    - **Framework Preset:** Next.js
    - **Build Command:** `npm run build`
    - **Output Directory:** (auto)
    - **Install Command:** `npm install`
 5. Click **Deploy**
-6. Wait ~2 minutes — you get a URL like `https://girdcalculator.vercel.app`
+6. Wait ~2 minutes — you get a URL like `https://gridcalculator.vercel.app`
 
 ### Auto-deploy on push
 
@@ -73,7 +73,7 @@ In **Project → Settings → Environment Variables**, add:
 
 | Name | Example | Environments |
 |------|---------|--------------|
-| `NEXT_PUBLIC_SITE_URL` | `https://girdcalculator.vercel.app` | Production |
+| `NEXT_PUBLIC_SITE_URL` | `https://gridcalculator.vercel.app` | Production |
 
 ### Vercel Analytics (page views)
 
