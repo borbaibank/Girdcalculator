@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import { InputField, ToggleGroup } from "@/components/ui/FormFields";
 import { StatCard } from "@/components/ui/StatCard";
 import { SectionCard } from "@/components/ui/SectionCard";
-import { BacktestPanel } from "@/components/grid/BacktestPanel";
 import { PriceRangeBar } from "@/components/grid/PriceRangeBar";
 import { SimulationPanel } from "@/components/grid/SimulationPanel";
 import { calculateGrid, formatProfitPerGridRange } from "@/lib/calculators/grid";
@@ -564,8 +563,6 @@ export function GridCalculator() {
           )}
         </div>
       </div>
-
-      {gridInput && <BacktestPanel key="backtest" grid={gridInput} />}
 
       {/* Tables — full width, tabbed */}
       {result && (

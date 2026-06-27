@@ -12,7 +12,7 @@ function cellZone(
   return "current";
 }
 
-/** Build grid cells — shared by calculator and backtest. */
+/** Build grid cells for the calculator. */
 export function buildGridCells(input: GridCalculatorInput): GridCell[] | null {
   const {
     upperPrice,

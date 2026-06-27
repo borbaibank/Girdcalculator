@@ -10,9 +10,7 @@
     "rebuild": "npm run clean && npm run build",
     "start": "next start",
     "start:clean": "npm run rebuild && next start",
-    "lint": "next lint",
-    "test": "vitest run",
-    "test:watch": "vitest"
+    "lint": "next lint"
   },
   "dependencies": {
     "@vercel/analytics": "^2.0.1",
@@ -29,7 +27,6 @@
     "eslint": "^9.23.0",
     "eslint-config-next": "^15.2.4",
     "tailwindcss": "^4.0.17",
-    "typescript": "^5.8.2",
-    "vitest": "^3.0.9"
+    "typescript": "^5.8.2"
   }
 }
