@@ -46,7 +46,8 @@ Repo: [github.com/borbaibank/Gridcalculator](https://github.com/borbaibank/Gridc
 
 1. Go to [vercel.com](https://vercel.com) and sign in with **GitHub**
 2. Click **Add New… → Project**
-3. Import **borbaibank/Gridcalculator**4. Keep default settings:
+3. Import **borbaibank/Gridcalculator**
+4. Keep default settings:
    - **Framework Preset:** Next.js
    - **Build Command:** `npm run build`
    - **Output Directory:** (auto)
@@ -70,10 +71,14 @@ Check progress at **Vercel Dashboard → Deployments**.
 
 If the Vercel project still uses the typo `girdcalculator`:
 
-1. **Vercel** → **Settings → General → Project Name** → `gridcalculator`
-2. **Vercel** → **Settings → Environment Variables** → set `NEXT_PUBLIC_SITE_URL` to `https://gridcalculator.vercel.app`
-3. Redeploy (push to `main` or **Deployments → Redeploy**)
-4. **Google Search Console** — add the new URL and submit `https://gridcalculator.vercel.app/sitemap.xml`
+1. **Vercel** → **Settings → General → Project Name** → `gridcalculator` → **Save**
+2. **Domains** should show `gridcalculator.vercel.app`
+3. Optional: set `NEXT_PUBLIC_SITE_URL` to `https://gridcalculator.vercel.app`
+4. Redeploy (push to `main` or **Deployments → Redeploy**)
+5. **Google Search Console** — add the new URL and submit `https://gridcalculator.vercel.app/sitemap.xml`
+
+GitHub repo is already `borbaibank/Gridcalculator`. Middleware redirects old `girdcalculator.vercel.app` hits to `gridcalculator.vercel.app`.
+
 ### Vercel environment variables
 
 In **Project → Settings → Environment Variables**, add:
@@ -90,23 +95,6 @@ In **Project → Settings → Environment Variables**, add:
 4. Data may take 30 minutes to 24 hours to appear after the first visits
 
 No extra env vars or third-party accounts required.
-
-### Fix `gird` → `grid` typo (URL + repo)
-
-**1. Vercel (changes the live URL)** — do this in the browser:
-
-1. [vercel.com](https://vercel.com) → your project → **Settings** → **General**
-2. **Project Name** → change `girdcalculator` to `gridcalculator` → **Save**
-3. **Domains** should show `gridcalculator.vercel.app`
-4. Optional: update `NEXT_PUBLIC_SITE_URL` env var to `https://gridcalculator.vercel.app`
-
-**2. GitHub (optional repo name)** — [github.com/borbaibank/Girdcalculator/settings](https://github.com/borbaibank/Girdcalculator/settings) → **Repository name** → `Gridcalculator` → then locally:
-
-```bash
-git remote set-url origin https://github.com/borbaibank/Gridcalculator.git
-```
-
-**3. Code (already done)** — middleware redirects `girdcalculator.vercel.app` → `gridcalculator.vercel.app` after the Vercel rename.
 
 ### Google Search (SEO)
 
