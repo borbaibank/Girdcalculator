@@ -91,6 +91,23 @@ In **Project → Settings → Environment Variables**, add:
 
 No extra env vars or third-party accounts required.
 
+### Fix `gird` → `grid` typo (URL + repo)
+
+**1. Vercel (changes the live URL)** — do this in the browser:
+
+1. [vercel.com](https://vercel.com) → your project → **Settings** → **General**
+2. **Project Name** → change `girdcalculator` to `gridcalculator` → **Save**
+3. **Domains** should show `gridcalculator.vercel.app`
+4. Optional: update `NEXT_PUBLIC_SITE_URL` env var to `https://gridcalculator.vercel.app`
+
+**2. GitHub (optional repo name)** — [github.com/borbaibank/Girdcalculator/settings](https://github.com/borbaibank/Girdcalculator/settings) → **Repository name** → `Gridcalculator` → then locally:
+
+```bash
+git remote set-url origin https://github.com/borbaibank/Gridcalculator.git
+```
+
+**3. Code (already done)** — middleware redirects `girdcalculator.vercel.app` → `gridcalculator.vercel.app` after the Vercel rename.
+
 ### Google Search (SEO)
 
 Google does not index new sites automatically. After deploy:
