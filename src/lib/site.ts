@@ -38,5 +38,5 @@ function getSiteUrlFallback(): string {
   const deployment = process.env.VERCEL_URL?.replace(/\/$/, "");
   if (deployment) return `https://${deployment}`;
 
-  return "http://localhost:3000";
+  return "http://localhost:4000";
 }

@@ -1,37 +1,116 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { InputField, ToggleGroup } from "@/components/ui/FormFields";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { InputField, SelectField, ToggleGroup } from "@/components/ui/FormFields";
 import { StatCard } from "@/components/ui/StatCard";
 import { SectionCard } from "@/components/ui/SectionCard";
 import { PriceRangeBar } from "@/components/grid/PriceRangeBar";
 import { SimulationPanel } from "@/components/grid/SimulationPanel";
 import { calculateGrid, formatProfitPerGridRange } from "@/lib/calculators/grid";
+import {
+  calculateCoinMGrid,
+  formatCoinMProfitPerGridRange,
+} from "@/lib/calculators/coin-m-grid";
 import { loadGridSettings, saveGridSettings } from "@/lib/grid-settings-storage";
-import { formatNumber, formatPercent, formatUsd } from "@/lib/utils/format";
-import type { Direction, GridType } from "@/types/calculator";
+import { formatCoin, formatNumber, formatPercent, formatUsd } from "@/lib/utils/format";
+import type { Direction, GridType, MarketType } from "@/types/calculator";
+
+const COIN_PAIRS = [
+  { symbol: "BTC", apiSymbol: "BTCUSD_PERP" },
+  { symbol: "ETH", apiSymbol: "ETHUSD_PERP" },
+] as const;
+
+function defaultsForMarket(market: MarketType) {
+  const saved = loadGridSettings(market);
+  const isCoinM = market === "coin-m";
+  return {
+    upperPrice: saved?.upperPrice ?? (isCoinM ? "120000" : "120000"),
+    lowerPrice: saved?.lowerPrice ?? (isCoinM ? "50000" : "40000"),
+    currentPrice: saved?.currentPrice ?? (isCoinM ? "60255" : "60000"),
+    startBotPrice: saved?.startBotPrice ?? "",
+    gridCount: saved?.gridCount ?? "200",
+    margin: saved?.margin ?? (isCoinM ? "0.08563" : "200"),
+    addedMargin: saved?.addedMargin ?? "0",
+    feePercent: saved?.feePercent ?? (isCoinM ? "0.02" : "0.05"),
+    leverage: saved?.leverage ?? (isCoinM ? "6" : "5"),
+    maintenanceMargin: saved?.maintenanceMargin ?? "0.4",
+    direction: (saved?.direction ?? (isCoinM ? "long" : "neutral")) as Direction,
+    gridType: (saved?.gridType ?? (isCoinM ? "geometric" : "arithmetic")) as GridType,
+    coinSymbol: saved?.coinSymbol ?? "BTC",
+  };
+}
 
 export function GridCalculator() {
-  const [upperPrice, setUpperPrice] = useState(() => loadGridSettings()?.upperPrice ?? "120000");
-  const [lowerPrice, setLowerPrice] = useState(() => loadGridSettings()?.lowerPrice ?? "40000");
-  const [currentPrice, setCurrentPrice] = useState(() => loadGridSettings()?.currentPrice ?? "60000");
-  const [startBotPrice, setStartBotPrice] = useState(() => loadGridSettings()?.startBotPrice ?? "");
-  const [gridCount, setGridCount] = useState(() => loadGridSettings()?.gridCount ?? "200");
-  const [margin, setMargin] = useState(() => loadGridSettings()?.margin ?? "200");
-  const [addedMargin, setAddedMargin] = useState(() => loadGridSettings()?.addedMargin ?? "0");
-  const [feePercent, setFeePercent] = useState(() => loadGridSettings()?.feePercent ?? "0.05");
-  const [leverage, setLeverage] = useState(() => loadGridSettings()?.leverage ?? "5");
+  const [marketType, setMarketType] = useState<MarketType>("usdt-m");
+  const [upperPrice, setUpperPrice] = useState(() => defaultsForMarket("usdt-m").upperPrice);
+  const [lowerPrice, setLowerPrice] = useState(() => defaultsForMarket("usdt-m").lowerPrice);
+  const [currentPrice, setCurrentPrice] = useState(() => defaultsForMarket("usdt-m").currentPrice);
+  const [startBotPrice, setStartBotPrice] = useState(() => defaultsForMarket("usdt-m").startBotPrice);
+  const [gridCount, setGridCount] = useState(() => defaultsForMarket("usdt-m").gridCount);
+  const [margin, setMargin] = useState(() => defaultsForMarket("usdt-m").margin);
+  const [addedMargin, setAddedMargin] = useState(() => defaultsForMarket("usdt-m").addedMargin);
+  const [feePercent, setFeePercent] = useState(() => defaultsForMarket("usdt-m").feePercent);
+  const [leverage, setLeverage] = useState(() => defaultsForMarket("usdt-m").leverage);
   const [maintenanceMargin, setMaintenanceMargin] = useState(
-    () => loadGridSettings()?.maintenanceMargin ?? "0.4",
+    () => defaultsForMarket("usdt-m").maintenanceMargin,
   );
   const [direction, setDirection] = useState<Direction>(
-    () => loadGridSettings()?.direction ?? "neutral",
+    () => defaultsForMarket("usdt-m").direction,
   );
   const [gridType, setGridType] = useState<GridType>(
-    () => loadGridSettings()?.gridType ?? "arithmetic",
+    () => defaultsForMarket("usdt-m").gridType,
+  );
+  const [coinSymbol, setCoinSymbol] = useState(
+    () => defaultsForMarket("coin-m").coinSymbol,
   );
   const [activeTable, setActiveTable] = useState<"orders" | "grid">("orders");
   const [hydrated, setHydrated] = useState(false);
+
+  const isCoinM = marketType === "coin-m";
+  const coinPair = COIN_PAIRS.find((p) => p.symbol === coinSymbol) ?? COIN_PAIRS[0];
+
+  const applyMarketDefaults = useCallback((market: MarketType) => {
+    const d = defaultsForMarket(market);
+    setUpperPrice(d.upperPrice);
+    setLowerPrice(d.lowerPrice);
+    setCurrentPrice(d.currentPrice);
+    setStartBotPrice(d.startBotPrice);
+    setGridCount(d.gridCount);
+    setMargin(d.margin);
+    setAddedMargin(d.addedMargin);
+    setFeePercent(d.feePercent);
+    setLeverage(d.leverage);
+    setMaintenanceMargin(d.maintenanceMargin);
+    setDirection(d.direction);
+    setGridType(d.gridType);
+    setCoinSymbol(d.coinSymbol);
+  }, []);
+
+  const switchMarket = (market: MarketType) => {
+    if (market === marketType) return;
+    if (hydrated) {
+      saveGridSettings(
+        {
+          upperPrice,
+          lowerPrice,
+          currentPrice,
+          startBotPrice,
+          gridCount,
+          margin,
+          addedMargin,
+          feePercent,
+          leverage,
+          maintenanceMargin,
+          direction,
+          gridType,
+          coinSymbol,
+        },
+        marketType,
+      );
+    }
+    setMarketType(market);
+    applyMarketDefaults(market);
+  };
 
   useEffect(() => {
     setHydrated(true);
@@ -39,22 +118,27 @@ export function GridCalculator() {
 
   useEffect(() => {
     if (!hydrated) return;
-    saveGridSettings({
-      upperPrice,
-      lowerPrice,
-      currentPrice,
-      startBotPrice,
-      gridCount,
-      margin,
-      addedMargin,
-      feePercent,
-      leverage,
-      maintenanceMargin,
-      direction,
-      gridType,
-    });
+    saveGridSettings(
+      {
+        upperPrice,
+        lowerPrice,
+        currentPrice,
+        startBotPrice,
+        gridCount,
+        margin,
+        addedMargin,
+        feePercent,
+        leverage,
+        maintenanceMargin,
+        direction,
+        gridType,
+        coinSymbol,
+      },
+      marketType,
+    );
   }, [
     hydrated,
+    marketType,
     upperPrice,
     lowerPrice,
     currentPrice,
@@ -67,12 +151,16 @@ export function GridCalculator() {
     maintenanceMargin,
     direction,
     gridType,
+    coinSymbol,
   ]);
 
   useEffect(() => {
-    if (!hydrated || loadGridSettings()?.currentPrice) return;
+    if (!hydrated || loadGridSettings(marketType)?.currentPrice) return;
     let cancelled = false;
-    fetch("https://fapi.binance.com/fapi/v1/ticker/price?symbol=BTCUSDT")
+    const apiUrl = isCoinM
+      ? `https://dapi.binance.com/dapi/v1/ticker/price?symbol=${coinPair.apiSymbol}`
+      : "https://fapi.binance.com/fapi/v1/ticker/price?symbol=BTCUSDT";
+    fetch(apiUrl)
       .then((res) => res.json())
       .then((data: { price?: string }) => {
         if (cancelled || !data.price) return;
@@ -83,7 +171,7 @@ export function GridCalculator() {
     return () => {
       cancelled = true;
     };
-  }, [hydrated]);
+  }, [hydrated, marketType, isCoinM, coinPair.apiSymbol]);
 
   const parsed = useMemo(() => {
     const upper = parseFloat(upperPrice);
@@ -94,9 +182,9 @@ export function GridCalculator() {
     const extra = parseFloat(addedMargin) || 0;
     const lev = parseFloat(leverage) || 1;
     const startRaw = parseFloat(startBotPrice);
-    const invest = collateral * lev;
+    const invest = isCoinM ? collateral * current * lev : collateral * lev;
     return { upper, lower, current, grids, collateral, extra, lev, invest, start: startRaw };
-  }, [upperPrice, lowerPrice, currentPrice, gridCount, margin, addedMargin, leverage, startBotPrice]);
+  }, [upperPrice, lowerPrice, currentPrice, gridCount, margin, addedMargin, leverage, startBotPrice, isCoinM]);
 
   const gridInput = useMemo(() => {
     const { upper, lower, current, grids, collateral, extra, start } = parsed;
@@ -129,13 +217,30 @@ export function GridCalculator() {
       maintenanceMarginPercent: parseFloat(maintenanceMargin) || 0.4,
       direction,
       gridType,
+      marketType,
+      coinSymbol,
     };
-  }, [parsed, feePercent, leverage, maintenanceMargin, direction, gridType]);
+  }, [
+    parsed,
+    feePercent,
+    leverage,
+    maintenanceMargin,
+    direction,
+    gridType,
+    marketType,
+    coinSymbol,
+  ]);
 
   const result = useMemo(
-    () => (gridInput ? calculateGrid(gridInput) : null),
-    [gridInput],
+    () => (gridInput ? (isCoinM ? calculateCoinMGrid(gridInput) : calculateGrid(gridInput)) : null),
+    [gridInput, isCoinM],
   );
+
+  const fmtMargin = (value: number, decimals = 2) =>
+    isCoinM ? formatCoin(value, coinSymbol, decimals) : formatUsd(value, decimals);
+
+  const fmtProfit = (value: number) =>
+    isCoinM ? formatCoin(value, coinSymbol, 8) : formatUsd(value);
 
   const effectiveStart = Number.isFinite(parsed.start) ? parsed.start : parsed.current;
   const startPriceError =
@@ -149,6 +254,8 @@ export function GridCalculator() {
     const current = parseFloat(addedMargin) || 0;
     setAddedMargin(String(current + amount));
   };
+
+  const addMarginPresets = isCoinM ? [0.01, 0.05, 0.1] : [50, 100, 500];
   const priceError =
     Number.isFinite(parsed.current) &&
     Number.isFinite(parsed.lower) &&
@@ -164,17 +271,44 @@ export function GridCalculator() {
 
   return (
     <div className="space-y-6">
+      {/* Market tabs */}
+      <div className="flex justify-center sm:justify-start">
+        <div className="inline-flex gap-1 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-elevated)]/60 p-1">
+          {(
+            [
+              { id: "usdt-m" as const, label: "USDT-M Futures" },
+              { id: "coin-m" as const, label: "Coin-M Futures" },
+            ] as const
+          ).map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => switchMarket(tab.id)}
+              className={`rounded-lg px-4 py-2.5 text-sm font-semibold transition-all duration-200 ${
+                marketType === tab.id
+                  ? "bg-[var(--color-primary)] text-[#0b0e11] shadow-[0_2px_12px_rgba(240,185,11,0.3)]"
+                  : "text-[var(--color-text-muted)] hover:bg-white/[0.04] hover:text-[var(--color-text)]"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Hero */}
       <div className="text-center sm:text-left">
         <p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-[var(--color-primary)]">
           Free Crypto Grid Bot Calculator
         </p>
         <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
-          Binance Futures <span className="gradient-text">Grid Trading</span> Calculator
+          Binance {isCoinM ? "Coin-M" : "USDT-M"}{" "}
+          <span className="gradient-text">Grid Trading</span> Calculator
         </h1>
         <p className="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-[var(--color-text-muted)] sm:mx-0">
-          Estimate profit per grid, liquidation price, margin, and buy/sell orders for
-          arithmetic or geometric grids — long, short, or neutral — before you deploy a bot.
+          {isCoinM
+            ? "Binance-style COIN-M grid: margin in coin, quantity per grid in USDT, 73/27 investment split (long)."
+            : "Estimate profit per grid, liquidation price, margin, and buy/sell orders for arithmetic or geometric grids — long, short, or neutral — before you deploy a bot."}
         </p>
       </div>
 
@@ -211,6 +345,15 @@ export function GridCalculator() {
               ]}
               onChange={(v) => setDirection(v as Direction)}
             />
+
+            {isCoinM && (
+              <SelectField
+                label="Coin Pair"
+                value={coinSymbol}
+                onChange={(e) => setCoinSymbol(e.target.value)}
+                options={COIN_PAIRS.map((p) => ({ value: p.symbol, label: `${p.symbol}USD_PERP` }))}
+              />
+            )}
 
             <div className="space-y-4">
               <InputField
@@ -294,24 +437,28 @@ export function GridCalculator() {
             <InputField
               label="Margin"
               type="number"
-              prefix="$"
+              prefix={isCoinM ? coinSymbol : "$"}
               value={margin}
               onChange={(e) => setMargin(e.target.value)}
-              hint={`Investment = Margin × Leverage = ${formatUsd(parsed.invest)}`}
+              hint={
+                isCoinM
+                  ? `Investment ≈ ${formatUsd(parsed.invest)} (${formatCoin(parsed.collateral, coinSymbol, 4)} × ${parsed.lev}x × price)`
+                  : `Investment = Margin × Leverage = ${formatUsd(parsed.invest)}`
+              }
             />
 
             <div className="space-y-2">
               <InputField
                 label="Add Margin"
                 type="number"
-                prefix="$"
+                prefix={isCoinM ? coinSymbol : "$"}
                 min={0}
                 value={addedMargin}
                 onChange={(e) => setAddedMargin(e.target.value)}
                 hint="Extra buffer to reduce liquidation risk (not used for grid orders)"
               />
               <div className="flex flex-wrap gap-2">
-                {[50, 100, 500].map((amount) => (
+                {addMarginPresets.map((amount) => (
                   <button
                     key={amount}
                     type="button"
@@ -324,7 +471,8 @@ export function GridCalculator() {
               </div>
               {(parsed.extra > 0 || parsed.collateral > 0) && (
                 <p className="text-xs text-[var(--color-success)]">
-                  Total wallet {formatUsd(parsed.collateral + parsed.extra)} (Margin + Add Margin)
+                  Total wallet {fmtMargin(parsed.collateral + parsed.extra, isCoinM ? 6 : 2)} (Margin
+                  + Add Margin)
                 </p>
               )}
             </div>
@@ -353,21 +501,47 @@ export function GridCalculator() {
                 </div>
               )}
 
+              {result.warnings && result.warnings.length > 0 && (
+                <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm">
+                  <p className="font-semibold text-amber-300">Margin / position warning</p>
+                  <ul className="mt-2 list-inside list-disc space-y-1 text-[var(--color-text-muted)]">
+                    {result.warnings.map((warning) => (
+                      <li key={warning}>{warning}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
               {/* Hero stat */}
               <div className="card-highlight">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                   <div>
                     <p className="label mb-2">Profit / Grid (Fee Deducted)</p>
                     <p className="text-4xl font-bold tracking-tight gradient-text sm:text-5xl">
-                      {formatProfitPerGridRange(
-                        result.netProfitPercentMin,
-                        result.netProfitPercentMax,
-                        gridType,
-                      )}
+                      {isCoinM
+                        ? formatCoinMProfitPerGridRange(
+                            result.gridProfitPercentMin ?? result.netProfitPercentMin,
+                            result.gridProfitPercentMax ?? result.netProfitPercentMax,
+                            gridType,
+                          )
+                        : formatProfitPerGridRange(
+                            result.netProfitPercentMin,
+                            result.netProfitPercentMax,
+                            gridType,
+                          )}
                     </p>
                     <p className="mt-2 text-sm text-[var(--color-text-muted)]">
-                      {formatUsd(result.profitPerGridMin)} – {formatUsd(result.profitPerGridMax)}{" "}
-                      <span className="text-[var(--color-text-muted)]/60">per cycle</span>
+                      {isCoinM ? (
+                        <>
+                          {fmtProfit(result.profitPerGridMin)} – {fmtProfit(result.profitPerGridMax)}{" "}
+                          <span className="text-[var(--color-text-muted)]/60">per cycle in {coinSymbol}</span>
+                        </>
+                      ) : (
+                        <>
+                          {fmtProfit(result.profitPerGridMin)} – {fmtProfit(result.profitPerGridMax)}{" "}
+                          <span className="text-[var(--color-text-muted)]/60">per cycle</span>
+                        </>
+                      )}
                     </p>
                   </div>
                   <div className="flex gap-3">
@@ -391,18 +565,119 @@ export function GridCalculator() {
                 </div>
               </div>
 
+              {isCoinM && result.coinMeta && (
+                <SectionCard title="Investment Distribution" subtitle="Binance COIN-M grid allocation" noPadding>
+                  <div className="space-y-4 p-5 sm:p-6">
+                    <div className="flex h-3 overflow-hidden rounded-full">
+                      <div
+                        className="bg-[var(--color-primary)]"
+                        style={{ width: `${result.coinMeta.deployRatio * 100}%` }}
+                      />
+                      <div
+                        className="bg-orange-500"
+                        style={{ width: `${result.coinMeta.reserveRatio * 100}%` }}
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
+                      <div>
+                        <p className="text-[var(--color-text-muted)]">Initial position</p>
+                        <p className="font-semibold text-[var(--color-primary)]">
+                          {formatPercent(result.coinMeta.deployRatio * 100, 0)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[var(--color-text-muted)]">For orders</p>
+                        <p className="font-semibold text-orange-400">
+                          {formatPercent(result.coinMeta.reserveRatio * 100, 0)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[var(--color-text-muted)]">Est. open value</p>
+                        <p className="font-semibold">
+                          {formatCoin(result.coinMeta.openValueBtc, coinSymbol, 4)} (Long)
+                        </p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                      <StatCard
+                        compact
+                        label="Qty / Grid (USDT)"
+                        value={formatUsd(result.coinMeta.quotePerGridUsd, 0)}
+                        variant="primary"
+                      />
+                      <StatCard
+                        compact
+                        label="Contracts / Grid"
+                        value={String(result.coinMeta.contractsPerGrid)}
+                      />
+                      <StatCard compact label="Order slots" value={String(result.coinMeta.orderSlots)} />
+                      <StatCard
+                        compact
+                        label="Investment"
+                        value={formatCoin(result.marginCollateral, coinSymbol, 5)}
+                      />
+                    </div>
+                  </div>
+                </SectionCard>
+              )}
+
               {/* Margin & Risk */}
               <SectionCard title="Margin & Liquidation" subtitle="Current status" noPadding>
-                <div className="grid gap-3 p-5 sm:grid-cols-2 lg:grid-cols-4 sm:p-6">
+                <div className="grid gap-3 p-5 sm:grid-cols-2 lg:grid-cols-3 sm:p-6">
+                  <StatCard
+                    compact
+                    label="Unrealized PnL @ Current"
+                    value={fmtMargin(
+                      result.simulationAtCurrent.unrealizedPnl,
+                      isCoinM ? 8 : 2,
+                    )}
+                    variant={
+                      result.simulationAtCurrent.unrealizedPnl >= 0 ? "success" : "danger"
+                    }
+                  />
+                  <StatCard
+                    compact
+                    label="Realized PnL @ Current"
+                    value={fmtMargin(
+                      result.simulationAtCurrent.realizedPnl,
+                      isCoinM ? 8 : 2,
+                    )}
+                    variant={
+                      result.simulationAtCurrent.realizedPnl >= 0 ? "success" : "danger"
+                    }
+                  />
+                  <StatCard
+                    compact
+                    label="Total PnL @ Current"
+                    value={fmtMargin(result.simulationAtCurrent.totalPnl, isCoinM ? 8 : 2)}
+                    variant={result.simulationAtCurrent.totalPnl >= 0 ? "success" : "danger"}
+                  />
+                </div>
+                {isCoinM && result.openPositionUnrealizedAtCurrent != null && (
+                  <div className="border-t border-[var(--color-border)] px-5 pb-5 sm:px-6">
+                    <p className="mb-2 text-xs text-[var(--color-text-muted)]">
+                      Open position (est. deploy) marked at current price — before grid fills
+                    </p>
+                    <StatCard
+                      compact
+                      label={`Open ${coinSymbol} Unrealized`}
+                      value={fmtMargin(result.openPositionUnrealizedAtCurrent, 8)}
+                      variant={
+                        result.openPositionUnrealizedAtCurrent >= 0 ? "success" : "danger"
+                      }
+                    />
+                  </div>
+                )}
+                <div className="grid gap-3 border-t border-[var(--color-border)] p-5 sm:grid-cols-2 lg:grid-cols-4 sm:p-6">
                   <StatCard
                     compact
                     label="Margin Used"
-                    value={formatUsd(result.margin.marginUsed)}
+                    value={fmtMargin(result.margin.marginUsed, isCoinM ? 6 : 2)}
                   />
                   <StatCard
                     compact
                     label="Free Margin"
-                    value={formatUsd(result.margin.freeMargin)}
+                    value={fmtMargin(result.margin.freeMargin, isCoinM ? 6 : 2)}
                     variant="success"
                   />
                   <StatCard
@@ -412,7 +687,7 @@ export function GridCalculator() {
                   />
                   <StatCard
                     compact
-                    label="Position Notional"
+                    label={isCoinM ? "Position Notional ($)" : "Position Notional"}
                     value={formatUsd(result.margin.positionNotional)}
                   />
                 </div>
@@ -432,7 +707,8 @@ export function GridCalculator() {
                     {parsed.extra > 0 && result.liquidationPriceBase > 0 && (
                       <p className="mt-2 text-xs text-[var(--color-success)]">
                         Before Add Margin: ${formatNumber(result.liquidationPriceBase)} → after +{" "}
-                        {formatUsd(parsed.extra)}: ${formatNumber(result.liquidationPrice)}
+                        {fmtMargin(parsed.extra, isCoinM ? 6 : 2)}: $
+                        {formatNumber(result.liquidationPrice)}
                       </p>
                     )}
                   </div>
@@ -444,8 +720,8 @@ export function GridCalculator() {
                       Liq ${formatNumber(result.simulationAtLower.liquidationPrice)}
                     </p>
                     <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-                      Total PnL {formatUsd(result.simulationAtLower.totalPnl)} · Coin{" "}
-                      {formatNumber(result.simulationAtLower.coinHeld, 4)}
+                      Total PnL {fmtMargin(result.simulationAtLower.totalPnl, isCoinM ? 6 : 2)} ·{" "}
+                      {formatCoin(result.simulationAtLower.coinHeld, coinSymbol, 6)}
                     </p>
                   </div>
                 </div>
@@ -453,42 +729,63 @@ export function GridCalculator() {
 
               {/* Coin holdings simulation */}
               <SectionCard
-                title="Coin Holdings by Price"
+                title={isCoinM ? `${coinSymbol} Holdings by Price` : "Coin Holdings by Price"}
                 subtitle="Simulated from Start Bot Price → target price"
                 noPadding
               >
                 <div className="space-y-4 p-5 sm:p-6">
                   <p className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)]/40 px-4 py-3 text-sm text-[var(--color-text-muted)]">
-                    Price rises → grid sells gradually → coin drops toward zero at Upper · Price
-                    falls → grid buys gradually → coin increases at Lower
+                    {isCoinM
+                      ? `Price rises → grid sells ${coinSymbol} gradually → position drops toward zero at Upper · Price falls → grid buys → more ${coinSymbol} accumulated at Lower`
+                      : "Price rises → grid sells gradually → coin drops toward zero at Upper · Price falls → grid buys gradually → coin increases at Lower"}
                   </p>
                   <SimulationPanel
                     title="@ Start Bot Price"
-                    subtitle="Coin held when the bot starts placing orders"
+                    subtitle="Position when the bot starts placing orders"
                     sim={result.simulationAtStart}
                     investment={result.totalWallet}
-                    coinLabel="Coin @ Start"
+                    currentPrice={parsed.current}
+                    coinLabel={isCoinM ? `${coinSymbol} @ Start` : "Coin @ Start"}
+                    quantityLabel={isCoinM ? `Size (${coinSymbol})` : undefined}
                     emphasizeCoin
+                    coinSymbol={isCoinM ? coinSymbol : undefined}
                   />
                   <SimulationPanel
                     title="@ Upper Price"
-                    subtitle="Price at top of range → sell grids fill → coin sold out"
+                    subtitle={
+                      isCoinM
+                        ? "Top of range → sell grids fill → BTC sold out"
+                        : "Price at top of range → sell grids fill → coin sold out"
+                    }
                     sim={result.simulationAtUpper}
                     investment={result.totalWallet}
+                    currentPrice={parsed.current}
+                    quantityLabel={isCoinM ? `Size (${coinSymbol})` : undefined}
+                    coinSymbol={isCoinM ? coinSymbol : undefined}
                   />
                   <SimulationPanel
                     title="@ Lower Price"
-                    subtitle="Price at bottom of range → buy grids fill → more coin accumulated"
+                    subtitle={
+                      isCoinM
+                        ? "Bottom of range → buy grids fill → more BTC held"
+                        : "Price at bottom of range → buy grids fill → more coin accumulated"
+                    }
                     sim={result.simulationAtLower}
                     investment={result.totalWallet}
+                    currentPrice={parsed.current}
+                    quantityLabel={isCoinM ? `Size (${coinSymbol})` : undefined}
+                    coinSymbol={isCoinM ? coinSymbol : undefined}
                   />
                   <SimulationPanel
                     title="@ Current Price"
                     subtitle="Simulated from Start Bot → entered price (Current)"
                     sim={result.simulationAtCurrent}
                     investment={result.totalWallet}
-                    coinLabel="Coin @ Current"
+                    currentPrice={parsed.current}
+                    coinLabel={isCoinM ? `${coinSymbol} @ Current` : "Coin @ Current"}
+                    quantityLabel={isCoinM ? `Size (${coinSymbol})` : undefined}
                     emphasizeCoin
+                    coinSymbol={isCoinM ? coinSymbol : undefined}
                   />
                 </div>
               </SectionCard>
@@ -497,33 +794,72 @@ export function GridCalculator() {
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                 <StatCard compact label="Spacing" value={formatUsd(result.spacing)} />
                 <StatCard compact label="Spacing %" value={formatPercent(result.spacingPercent)} />
-                <StatCard compact label="/ Grid" value={formatUsd(result.quotePerGrid)} />
+                <StatCard
+                  compact
+                  label={isCoinM ? "Qty / Grid (USDT)" : "/ Grid"}
+                  value={
+                    isCoinM && result.coinMeta
+                      ? formatUsd(result.coinMeta.quotePerGridUsd, 0)
+                      : formatUsd(result.quotePerGrid)
+                  }
+                />
                 <StatCard
                   compact
                   label="Investment"
-                  value={formatUsd(result.investment)}
+                  value={
+                    isCoinM
+                      ? formatCoin(result.marginCollateral, coinSymbol, 5)
+                      : formatUsd(result.investment)
+                  }
                   variant="primary"
                 />
                 <StatCard
                   compact
-                  label="Coin @ Start"
-                  value={formatNumber(result.holdingsAtStart.coin, 4)}
+                  label={isCoinM ? "Est. Open Value" : "Coin @ Start"}
+                  value={
+                    isCoinM && result.coinMeta
+                      ? formatCoin(result.coinMeta.openValueBtc, coinSymbol, 4)
+                      : formatNumber(result.holdingsAtStart.coin, 4)
+                  }
                 />
-                <StatCard compact label="USDT @ Start" value={formatUsd(result.holdingsAtStart.usdt)} />
                 <StatCard
                   compact
-                  label="Coin @ Current"
-                  value={formatNumber(result.simulationAtCurrent.coinHeld, 4)}
+                  label={isCoinM ? "Reserved Margin" : "USDT @ Start"}
+                  value={
+                    isCoinM
+                      ? formatCoin(result.holdingsAtStart.usdt, coinSymbol, 6)
+                      : formatUsd(result.holdingsAtStart.usdt)
+                  }
+                />
+                <StatCard
+                  compact
+                  label={isCoinM ? `${coinSymbol} @ Current` : "Coin @ Current"}
+                  value={formatCoin(result.simulationAtCurrent.coinHeld, coinSymbol, 6)}
                   variant="primary"
                 />
                 <StatCard
                   compact
-                  label="USDT @ Current"
-                  value={formatUsd(result.simulationAtCurrent.usdtBalance)}
+                  label="Unrealized @ Current"
+                  value={fmtMargin(
+                    result.simulationAtCurrent.unrealizedPnl,
+                    isCoinM ? 8 : 2,
+                  )}
+                  variant={
+                    result.simulationAtCurrent.unrealizedPnl >= 0 ? "success" : "danger"
+                  }
                 />
                 <StatCard
                   compact
-                  label="Position"
+                  label={isCoinM ? "Coin Balance" : "USDT @ Current"}
+                  value={
+                    isCoinM
+                      ? formatCoin(result.simulationAtCurrent.usdtBalance, coinSymbol, 6)
+                      : formatUsd(result.simulationAtCurrent.usdtBalance)
+                  }
+                />
+                <StatCard
+                  compact
+                  label={isCoinM ? "Notional ($)" : "Position"}
                   value={formatUsd(result.totalPosition)}
                   variant="primary"
                 />
@@ -601,8 +937,10 @@ export function GridCalculator() {
                   <tr className="table-head">
                     <th className="px-4 py-2.5">Type</th>
                     <th className="px-4 py-2.5">Price</th>
-                    <th className="hidden px-4 py-2.5 sm:table-cell">Qty</th>
-                    <th className="px-4 py-2.5">Amount</th>
+                    <th className="hidden px-4 py-2.5 sm:table-cell">
+                      {isCoinM ? `Size (${coinSymbol})` : "Qty"}
+                    </th>
+                    <th className="px-4 py-2.5">{isCoinM ? "Notional ($)" : "Amount"}</th>
                     <th className="hidden px-4 py-2.5 md:table-cell">Status</th>
                   </tr>
                 </thead>
@@ -616,7 +954,9 @@ export function GridCalculator() {
                       </td>
                       <td className="px-4 py-2.5 font-mono">{formatNumber(order.price)}</td>
                       <td className="hidden px-4 py-2.5 font-mono text-[var(--color-text-muted)] sm:table-cell">
-                        {formatNumber(order.quantity, 4)}
+                        {isCoinM
+                          ? formatCoin(order.quantity, coinSymbol, 6)
+                          : formatNumber(order.quantity, 4)}
                       </td>
                       <td className="px-4 py-2.5">{formatUsd(order.quoteAmount)}</td>
                       <td className="hidden px-4 py-2.5 md:table-cell">
@@ -633,7 +973,9 @@ export function GridCalculator() {
                     <th className="px-4 py-2.5">#</th>
                     <th className="px-4 py-2.5">Buy</th>
                     <th className="px-4 py-2.5">Sell</th>
-                    <th className="hidden px-4 py-2.5 sm:table-cell">Qty</th>
+                    <th className="hidden px-4 py-2.5 sm:table-cell">
+                      {isCoinM ? `Size (${coinSymbol})` : "Qty"}
+                    </th>
                     <th className="px-4 py-2.5">Profit</th>
                     <th className="hidden px-4 py-2.5 md:table-cell">Net %</th>
                   </tr>
@@ -652,12 +994,14 @@ export function GridCalculator() {
                         {formatNumber(cell.sellPrice)}
                       </td>
                       <td className="hidden px-4 py-2.5 font-mono text-[var(--color-text-muted)] sm:table-cell">
-                        {formatNumber(cell.quantity, 4)}
+                        {isCoinM
+                          ? formatCoin(cell.quantity, coinSymbol, 6)
+                          : formatNumber(cell.quantity, 4)}
                       </td>
                       <td
                         className={`px-4 py-2.5 font-semibold ${cell.netProfit >= 0 ? "text-[var(--color-success)]" : "text-[var(--color-danger)]"}`}
                       >
-                        {formatUsd(cell.netProfit)}
+                        {isCoinM ? formatCoin(cell.netProfit, coinSymbol, 6) : formatUsd(cell.netProfit)}
                       </td>
                       <td
                         className={`hidden px-4 py-2.5 md:table-cell ${cell.netProfitPercent >= 0 ? "text-[var(--color-success)]" : "text-[var(--color-danger)]"}`}

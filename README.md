@@ -18,7 +18,7 @@ cp .env.example .env.local   # optional — for SEO locally
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open [http://localhost:4000](http://localhost:4000).
 
 ## Features
 

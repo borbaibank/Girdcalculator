@@ -1,5 +1,6 @@
 export type GridType = "arithmetic" | "geometric";
 export type Direction = "neutral" | "long" | "short";
+export type MarketType = "usdt-m" | "coin-m";
 
 export interface GridCalculatorInput {
   upperPrice: number;
@@ -14,11 +15,21 @@ export interface GridCalculatorInput {
   maintenanceMarginPercent: number;
   direction: Direction;
   gridType: GridType;
+  marketType?: MarketType;
+  /** Order size in base coin per grid (e.g. 0.001 BTC). */
+  contractSize?: number;
+  coinSymbol?: string;
 }
 
-/** USDT notional allocated to grid orders (margin × leverage). */
-export function gridInvestment(input: Pick<GridCalculatorInput, "margin" | "leverage">): number {
+/** USD notional allocated to grid orders. */
+export function gridInvestment(
+  input: Pick<GridCalculatorInput, "margin" | "leverage" | "marketType" | "currentPrice">,
+): number {
   const lev = input.leverage > 0 ? input.leverage : 1;
+  if (input.marketType === "coin-m") {
+    const price = input.currentPrice > 0 ? input.currentPrice : 1;
+    return input.margin * price * lev;
+  }
   return input.margin * lev;
 }
 
@@ -66,6 +77,8 @@ export interface PriceSimulation {
   targetPrice: number;
   realizedPnl: number;
   unrealizedPnl: number;
+  /** Mark-to-market unrealized at current market price (may differ from targetPrice). */
+  unrealizedAtCurrentPrice?: number;
   totalPnl: number;
   coinHeld: number;
   usdtBalance: number;
@@ -91,6 +104,9 @@ export interface GridCalculatorResult {
   netProfitPercentMin: number;
   netProfitPercentMax: number;
   netProfitPercentAvg: number;
+  /** Coin-M: grid spacing % minus round-trip fee (Binance “profit/grid” display). */
+  gridProfitPercentMin?: number;
+  gridProfitPercentMax?: number;
   profitPerGridUsdtMin: number;
   profitPerGridUsdtMax: number;
   buyOrdersBelow: number;
@@ -114,4 +130,17 @@ export interface GridCalculatorResult {
   liquidationPriceBase: number;
   investment: number;
   marginCollateral: number;
+  warnings?: string[];
+  /** Coin-M: unrealized on initial deploy (73/27) marked at current price. */
+  openPositionUnrealizedAtCurrent?: number;
+  coinMeta?: {
+    quotePerGridUsd: number;
+    contractsPerGrid: number;
+    orderSlots: number;
+    deployRatio: number;
+    reserveRatio: number;
+    openValueBtc: number;
+    buyBelow: number;
+    sellAbove: number;
+  };
 }

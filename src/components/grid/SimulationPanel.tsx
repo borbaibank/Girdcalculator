@@ -1,14 +1,18 @@
 import { StatCard } from "@/components/ui/StatCard";
 import type { PriceSimulation } from "@/types/calculator";
-import { formatNumber, formatPercent, formatUsd } from "@/lib/utils/format";
+import { formatCoin, formatNumber, formatPercent, formatUsd } from "@/lib/utils/format";
 
 interface SimulationPanelProps {
   title: string;
   subtitle: string;
   sim: PriceSimulation;
   investment: number;
+  currentPrice?: number;
   coinLabel?: string;
   emphasizeCoin?: boolean;
+  /** When set, PnL and balance values display in coin instead of USD. */
+  coinSymbol?: string;
+  quantityLabel?: string;
 }
 
 export function SimulationPanel({
@@ -16,12 +20,27 @@ export function SimulationPanel({
   subtitle,
   sim,
   investment,
+  currentPrice,
   coinLabel = "Coin Held",
   emphasizeCoin = false,
+  coinSymbol,
+  quantityLabel,
 }: SimulationPanelProps) {
+  const fmt = (value: number, decimals = 2) =>
+    coinSymbol ? formatCoin(value, coinSymbol, decimals) : formatUsd(value, decimals);
+
+  const markPrice = currentPrice ?? sim.targetPrice;
+  const showCurrentMark =
+    sim.unrealizedAtCurrentPrice != null &&
+    Math.abs(sim.targetPrice - markPrice) > Math.max(markPrice * 0.0001, 1);
+
   const pnlVariant = sim.totalPnl >= 0 ? "success" : "danger";
-  const unrealizedVariant = sim.unrealizedPnl >= 0 ? "success" : "danger";
   const realizedVariant = sim.realizedPnl >= 0 ? "success" : "danger";
+  const heldLabel = quantityLabel ?? coinLabel;
+  const heldValue = coinSymbol
+    ? formatCoin(sim.coinHeld, coinSymbol, 6)
+    : formatNumber(sim.coinHeld, 6);
+  const balanceLabel = coinSymbol ? "Coin Balance" : "USDT Balance";
 
   return (
     <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-elevated)]/30 p-4">
@@ -38,30 +57,51 @@ export function SimulationPanel({
       <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
         <StatCard
           compact
-          label={coinLabel}
-          value={formatNumber(sim.coinHeld, 6)}
+          label={heldLabel}
+          value={heldValue}
           variant={emphasizeCoin ? "primary" : "default"}
         />
         <StatCard
           compact
           label="Realized PnL (grid sells)"
-          value={formatUsd(sim.realizedPnl)}
+          value={fmt(sim.realizedPnl, coinSymbol ? 6 : 2)}
           variant={realizedVariant}
         />
         <StatCard
           compact
-          label="Unrealized PnL (coin)"
-          value={formatUsd(sim.unrealizedPnl)}
-          variant={unrealizedVariant}
+          label={
+            showCurrentMark
+              ? `Unrealized @ $${formatNumber(sim.targetPrice)}`
+              : coinSymbol
+                ? "Unrealized PnL"
+                : "Unrealized PnL (coin)"
+          }
+          value={fmt(sim.unrealizedPnl, coinSymbol ? 8 : 2)}
+          variant={sim.unrealizedPnl >= 0 ? "success" : "danger"}
         />
+        {showCurrentMark && (
+          <StatCard
+            compact
+            label={`Unrealized @ $${formatNumber(markPrice)}`}
+            value={fmt(sim.unrealizedAtCurrentPrice!, coinSymbol ? 8 : 2)}
+            variant={
+              (sim.unrealizedAtCurrentPrice ?? 0) >= 0 ? "success" : "danger"
+            }
+          />
+        )}
         <StatCard
           compact
           label="Total PnL"
-          value={formatUsd(sim.totalPnl)}
+          value={fmt(sim.totalPnl, coinSymbol ? 6 : 2)}
           variant={pnlVariant}
         />
-        <StatCard compact label="USDT Balance" value={formatUsd(sim.usdtBalance)} />
-        <StatCard compact label="Total Equity" value={formatUsd(sim.totalEquity)} variant="primary" />
+        <StatCard compact label={balanceLabel} value={fmt(sim.usdtBalance, coinSymbol ? 6 : 2)} />
+        <StatCard
+          compact
+          label="Total Equity"
+          value={fmt(sim.totalEquity, coinSymbol ? 6 : 2)}
+          variant="primary"
+        />
         <StatCard compact label="Avg Cost" value={`$${formatNumber(sim.avgCost)}`} />
         <StatCard compact label="Buys Filled" value={String(sim.filledBuys)} />
         <StatCard compact label="Sells Filled" value={String(sim.filledSells)} />
@@ -86,17 +126,18 @@ export function SimulationPanel({
           <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
             <div>
               <p className="text-[10px] text-[var(--color-text-muted)]">Used</p>
-              <p className="font-semibold">{formatUsd(sim.margin.marginUsed)}</p>
+              <p className="font-semibold">{fmt(sim.margin.marginUsed, coinSymbol ? 6 : 2)}</p>
             </div>
             <div>
               <p className="text-[10px] text-[var(--color-text-muted)]">Free</p>
               <p className="font-semibold text-[var(--color-success)]">
-                {formatUsd(sim.margin.freeMargin)}
+                {fmt(sim.margin.freeMargin, coinSymbol ? 6 : 2)}
               </p>
             </div>
           </div>
           <p className="mt-2 text-xs text-[var(--color-text-muted)]">
-            ROI {formatPercent((sim.totalPnl / investment) * 100)} on {formatUsd(investment)} capital
+            ROI {formatPercent((sim.totalPnl / investment) * 100)} on{" "}
+            {coinSymbol ? formatCoin(investment, coinSymbol, 4) : formatUsd(investment)} capital
           </p>
         </div>
       </div>

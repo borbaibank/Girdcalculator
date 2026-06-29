@@ -67,6 +67,7 @@ function walletToSimulation(
   const absQty = Math.abs(coinHeld);
 
   const unrealizedPnl = walletUnrealizedPnl(wallet, targetPrice, direction);
+  const unrealizedAtCurrentPrice = walletUnrealizedPnl(wallet, input.currentPrice, direction);
   const totalEquity = walletEquity(wallet, targetPrice);
   const totalPnl = totalEquity - walletBalance;
   const liqWallet = walletBalance + wallet.realizedPnl;
@@ -101,6 +102,7 @@ function walletToSimulation(
     targetPrice,
     realizedPnl: wallet.realizedPnl,
     unrealizedPnl,
+    unrealizedAtCurrentPrice,
     totalPnl,
     coinHeld,
     usdtBalance: wallet.usdt,

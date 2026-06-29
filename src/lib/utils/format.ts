@@ -18,6 +18,12 @@ export function formatUsd(value: number, decimals = 2): string {
   return `${sign}$${formatNumber(Math.abs(value), decimals)}`;
 }
 
+export function formatCoin(value: number, symbol: string, decimals = 6): string {
+  if (!Number.isFinite(value)) return "—";
+  const sign = value < 0 ? "-" : "";
+  return `${sign}${formatNumber(Math.abs(value), decimals)} ${symbol}`;
+}
+
 export function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
