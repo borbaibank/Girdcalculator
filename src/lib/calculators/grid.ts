@@ -11,6 +11,7 @@ import {
   calculateLiquidationLong,
   calculateLiquidationShort,
   calculateMargin,
+  pionexGridPositionQty,
   simulatePriceMove,
   snapshotAtStart,
 } from "@/lib/calculators/simulation";
@@ -87,39 +88,38 @@ export function calculateGrid(
 
   const margin = calculateMargin(projectedCoin, currentPrice, wallet, leverage);
 
-  const absCoin = Math.abs(projectedCoin);
-  const avgEntry =
-    absCoin > 0
-      ? direction === "short"
-        ? cells.filter((c) => c.sellPrice > startBotPrice)[0]?.sellPrice ?? startBotPrice
-        : startBotPrice
-      : 0;
+  const pionexQty = pionexGridPositionQty(input);
+  const liqQty =
+    direction === "long" || direction === "short"
+      ? pionexQty
+      : Math.abs(projectedCoin);
+  const avgEntry = liqQty > 0 ? startBotPrice : 0;
 
   let liquidationPriceBase = 0;
   let liquidationPrice = 0;
-  if (direction === "short" && absCoin > 0) {
+  if (direction === "short" && liqQty > 0) {
     liquidationPriceBase = calculateLiquidationShort(
       avgEntry,
-      absCoin,
+      liqQty,
       input.margin,
       maintenanceMarginPercent,
     );
     liquidationPrice = calculateLiquidationShort(
       avgEntry,
-      absCoin,
+      liqQty,
       wallet,
       maintenanceMarginPercent,
     );
-  } else if (absCoin > 0) {
+  } else if (liqQty > 0) {
     liquidationPriceBase = calculateLiquidationLong(
       avgEntry,
-      absCoin,
+      liqQty,
       input.margin,
       maintenanceMarginPercent,
     );
     liquidationPrice = calculateLiquidationLong(
       avgEntry,
-      absCoin,
+      liqQty,
       wallet,
       maintenanceMarginPercent,
     );

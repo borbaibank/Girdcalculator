@@ -143,6 +143,26 @@ export function initCoinMWallet(
   };
 }
 
+/**
+ * Draw `cost` (margin + fee) from the wallet, preferring the reserved-order
+ * bucket before touching free coin balance. Returns false (no funds mutated)
+ * if the wallet cannot cover the cost at all — using reservedCoin + coinBalance
+ * combined avoids incorrectly rejecting a fill just because the fee alone
+ * exceeds the free balance while the reserve still has room for it.
+ */
+function drawFromWallet(wallet: CoinMWalletState, cost: number): boolean {
+  const available = wallet.reservedCoin + wallet.coinBalance;
+  if (available < cost) return false;
+
+  if (wallet.reservedCoin >= cost) {
+    wallet.reservedCoin -= cost;
+  } else {
+    wallet.coinBalance -= cost - wallet.reservedCoin;
+    wallet.reservedCoin = 0;
+  }
+  return true;
+}
+
 function executeBuyLong(
   wallet: CoinMWalletState,
   cell: GridCell,
@@ -152,15 +172,7 @@ function executeBuyLong(
   const margin = marginForBtcPosition(cell.quantity, leverage);
   const fee = inverseTradeFeeBtc(cell.quantity, feeRate);
 
-  if (wallet.reservedCoin >= margin) {
-    wallet.reservedCoin -= margin;
-    if (wallet.coinBalance < fee) return;
-    wallet.coinBalance -= fee;
-  } else if (wallet.coinBalance < margin + fee) {
-    return;
-  } else {
-    wallet.coinBalance -= margin + fee;
-  }
+  if (!drawFromWallet(wallet, margin + fee)) return;
 
   wallet.lots.push({
     btcSize: cell.quantity,
@@ -180,15 +192,7 @@ function executeOpenShort(
   const margin = marginForBtcPosition(cell.quantity, leverage);
   const fee = inverseTradeFeeBtc(cell.quantity, feeRate);
 
-  if (wallet.reservedCoin >= margin) {
-    wallet.reservedCoin -= margin;
-    if (wallet.coinBalance < fee) return;
-    wallet.coinBalance -= fee;
-  } else if (wallet.coinBalance < margin + fee) {
-    return;
-  } else {
-    wallet.coinBalance -= margin + fee;
-  }
+  if (!drawFromWallet(wallet, margin + fee)) return;
 
   wallet.lots.push({
     btcSize: cell.quantity,
