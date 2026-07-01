@@ -37,6 +37,9 @@ export function totalWallet(input: Pick<GridCalculatorInput, "margin" | "addedMa
   return input.margin + input.addedMargin;
 }
 
+/** ~10% reserved for orders/dynamic margin on futures grids (Pionex-style). */
+export const FUTURES_GRID_DEPLOY_RATIO = 0.9;
+
 export function isBotStarted(currentPrice: number, startBotPrice: number): boolean {
   if (startBotPrice < currentPrice) return currentPrice <= startBotPrice;
   if (startBotPrice > currentPrice) return currentPrice >= startBotPrice;

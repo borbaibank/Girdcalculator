@@ -1,11 +1,10 @@
 import type { GridCell, GridCalculatorInput, MarginInfo, PriceSimulation } from "@/types/calculator";
-import { gridInvestment, totalWallet } from "@/types/calculator";
+import { FUTURES_GRID_DEPLOY_RATIO, gridInvestment, totalWallet } from "@/types/calculator";
 import {
   createWalletAtStart,
   type GridWalletState,
   type InventoryLot,
   walkPrice,
-  walletEquity,
   walletUnrealizedPnl,
 } from "@/lib/calculators/grid-engine";
 
@@ -49,12 +48,7 @@ export function calculateLiquidationShort(
   return liq;
 }
 
-/**
- * Pionex futures grid keeps ~10% of investment as dynamic/order buffer.
- * Estimated liquidation uses 90% of full leveraged notional at start price.
- */
-export const PIONEX_GRID_DEPLOY_RATIO = 0.9;
-
+/** Pionex-style liq estimate: 90% of full leveraged notional deployed at start. */
 export function pionexGridPositionQty(
   input: Pick<GridCalculatorInput, "margin" | "leverage" | "startBotPrice" | "direction" | "marketType" | "currentPrice">,
 ): number {
@@ -64,7 +58,7 @@ export function pionexGridPositionQty(
   const investment = gridInvestment(input);
   if (investment <= 0) return 0;
 
-  return (investment / startBotPrice) * PIONEX_GRID_DEPLOY_RATIO;
+  return (investment / startBotPrice) * FUTURES_GRID_DEPLOY_RATIO;
 }
 
 function weightedAvgCost(lots: InventoryLot[]): number {
@@ -86,8 +80,8 @@ function walletToSimulation(
 
   const unrealizedPnl = walletUnrealizedPnl(wallet, targetPrice, direction);
   const unrealizedAtCurrentPrice = walletUnrealizedPnl(wallet, input.currentPrice, direction);
-  const totalEquity = walletEquity(wallet, targetPrice);
-  const totalPnl = totalEquity - walletBalance;
+  const totalPnl = wallet.realizedPnl + unrealizedPnl;
+  const totalEquity = walletBalance + totalPnl;
   const liqWallet = walletBalance + wallet.realizedPnl;
 
   const margin = calculateMargin(coinHeld, targetPrice, liqWallet, leverage);

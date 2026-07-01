@@ -1,5 +1,5 @@
 import type { GridCalculatorInput, GridCell } from "@/types/calculator";
-import { gridInvestment } from "@/types/calculator";
+import { FUTURES_GRID_DEPLOY_RATIO, gridInvestment, totalWallet } from "@/types/calculator";
 
 export interface InventoryLot {
   quantity: number;
@@ -25,17 +25,22 @@ export function initWallet(
   startPrice: number,
   quotePerGrid: number,
   direction: GridCalculatorInput["direction"],
+  input?: GridCalculatorInput,
 ): GridWalletState {
   const lots: InventoryLot[] = [];
   let usdt = 0;
   let coin = 0;
 
-  if (direction === "long") {
-    for (const cell of cells) {
-      lots.push({ quantity: cell.quantity, entryPrice: startPrice, gridLevel: cell.level });
-    }
-    coin = totalCoin(lots);
-    return { coin, usdt: 0, realizedPnl: 0, lots, filledBuys: cells.length, filledSells: 0 };
+  if (direction === "long" && input) {
+    const investment = gridInvestment(input);
+    const lev = input.leverage > 0 ? input.leverage : 1;
+    const deployQty = (investment / startPrice) * FUTURES_GRID_DEPLOY_RATIO;
+    const walletMargin = totalWallet(input);
+    const openMarginUsed = (deployQty * startPrice) / lev;
+    lots.push({ quantity: deployQty, entryPrice: startPrice, gridLevel: 0 });
+    coin = deployQty;
+    usdt = Math.max(0, walletMargin - openMarginUsed);
+    return { coin, usdt, realizedPnl: 0, lots, filledBuys: 0, filledSells: 0 };
   }
 
   if (direction === "short") {
@@ -93,21 +98,40 @@ function executeSellFromLevel(wallet: GridWalletState, cell: GridCell, feeRate: 
   wallet.filledSells++;
 }
 
+function closeLotQty(
+  wallet: GridWalletState,
+  lot: InventoryLot,
+  lotIdx: number,
+  sellPrice: number,
+  closeQty: number,
+  feeRate: number,
+): void {
+  const qty = Math.min(closeQty, lot.quantity);
+  if (qty <= 0) return;
+
+  const revenue = sellPrice * qty;
+  const fee = revenue * feeRate;
+  const cost = lot.entryPrice * qty;
+  const buyFee = cost * feeRate;
+
+  wallet.realizedPnl += revenue - cost - fee - buyFee;
+  wallet.usdt += revenue - fee;
+
+  if (qty >= lot.quantity - 1e-12) {
+    wallet.lots.splice(lotIdx, 1);
+  } else {
+    lot.quantity -= qty;
+  }
+  wallet.filledSells++;
+}
+
 function matchSellLots(wallet: GridWalletState, cell: GridCell, feeRate: number): void {
   const lotIdx = wallet.lots.findIndex(
     (l) => l.gridLevel === cell.level || Math.abs(l.entryPrice - cell.buyPrice) < 0.0001,
   );
   if (lotIdx < 0) {
     if (wallet.lots.length === 0) return;
-    const lot = wallet.lots[0];
-    const revenue = cell.sellPrice * lot.quantity;
-    const fee = revenue * feeRate;
-    const cost = lot.entryPrice * lot.quantity;
-    const buyFee = cost * feeRate;
-    wallet.realizedPnl += revenue - cost - fee - buyFee;
-    wallet.usdt += revenue - fee;
-    wallet.lots.shift();
-    wallet.filledSells++;
+    closeLotQty(wallet, wallet.lots[0], 0, cell.sellPrice, cell.quantity, feeRate);
   } else {
     executeSellFromLevel(wallet, cell, feeRate);
   }
@@ -134,13 +158,15 @@ function settleImmediateSellsAtStart(
   cells: GridCell[],
   startPrice: number,
   direction: GridCalculatorInput["direction"],
-  feeRate: number,
+  _feeRate: number,
 ): void {
+  // Long/short futures grid: initial position stays intact at start — no retroactive sells.
+  if (direction === "long") return;
   if (direction === "short") return;
 
   for (const cell of cells) {
     if (cell.sellPrice <= startPrice) {
-      matchSellLots(wallet, cell, feeRate);
+      matchSellLots(wallet, cell, _feeRate);
     }
   }
 }
@@ -151,7 +177,7 @@ export function createWalletAtStart(
 ): GridWalletState {
   const quotePerGrid = gridInvestment(input) / input.gridCount;
   const feeRate = input.feePercent / 100;
-  const wallet = initWallet(cells, input.startBotPrice, quotePerGrid, input.direction);
+  const wallet = initWallet(cells, input.startBotPrice, quotePerGrid, input.direction, input);
   settleImmediateSellsAtStart(wallet, cells, input.startBotPrice, input.direction, feeRate);
   return wallet;
 }

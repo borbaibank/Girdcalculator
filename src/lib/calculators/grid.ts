@@ -4,7 +4,7 @@ import type {
   GridCell,
   GridOrder,
 } from "@/types/calculator";
-import { gridInvestment, isBotStarted, totalWallet } from "@/types/calculator";
+import { gridInvestment, isBotStarted, totalWallet, FUTURES_GRID_DEPLOY_RATIO } from "@/types/calculator";
 import { buildPriceLevels } from "@/lib/calculators/price-levels";
 import { buildGridCells } from "@/lib/calculators/grid-cells";
 import {
@@ -68,11 +68,11 @@ export function calculateGrid(
   );
 
   const holdings = botStarted
-    ? computeInitialHoldings(cells, startBotPrice, quotePerGrid, direction)
+    ? computeInitialHoldings(cells, startBotPrice, quotePerGrid, direction, investment)
     : { initialCoin: 0, initialUsdt: investment };
   const { initialCoin, initialUsdt } = holdings;
 
-  const projectedHoldings = computeInitialHoldings(cells, startBotPrice, quotePerGrid, direction);
+  const projectedHoldings = computeInitialHoldings(cells, startBotPrice, quotePerGrid, direction, investment);
   const projectedCoin = projectedHoldings.initialCoin;
   const holdingsAtStart = {
     coin: projectedHoldings.initialCoin,
@@ -339,9 +339,11 @@ function computeInitialHoldings(
   currentPrice: number,
   quotePerGrid: number,
   direction: GridCalculatorInput["direction"],
+  investment: number,
 ): { initialCoin: number; initialUsdt: number } {
   if (direction === "long") {
-    const coin = cells.reduce((sum, c) => sum + c.quantity, 0);
+    const coin =
+      currentPrice > 0 ? (investment / currentPrice) * FUTURES_GRID_DEPLOY_RATIO : 0;
     return { initialCoin: coin, initialUsdt: 0 };
   }
 
