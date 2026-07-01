@@ -20,39 +20,6 @@ import {
   snapshotCoinMAtStart,
 } from "@/lib/calculators/coin-m-simulation";
 
-function countOrderBookStats(
-  orders: GridOrder[],
-  startPrice: number,
-  direction: GridCalculatorInput["direction"],
-): { buyOrdersBelow: number; sellOrdersAbove: number } {
-  if (direction === "neutral") {
-    return {
-      buyOrdersBelow: orders.filter((o) => o.type === "buy" && o.status === "placed").length,
-      sellOrdersAbove: orders.filter((o) => o.type === "sell" && o.status === "placed").length,
-    };
-  }
-
-  if (direction === "long") {
-    return {
-      buyOrdersBelow: orders.filter(
-        (o) => o.type === "buy" && o.status === "placed" && o.price < startPrice,
-      ).length,
-      sellOrdersAbove: orders.filter(
-        (o) => o.type === "sell" && o.status === "pending" && o.price > startPrice,
-      ).length,
-    };
-  }
-
-  return {
-    buyOrdersBelow: orders.filter(
-      (o) => o.type === "buy" && o.status === "pending" && o.price < startPrice,
-    ).length,
-    sellOrdersAbove: orders.filter(
-      (o) => o.type === "sell" && o.status === "placed" && o.price > startPrice,
-    ).length,
-  };
-}
-
 function buildOrders(
   cells: GridCell[],
   startPrice: number,
@@ -223,7 +190,8 @@ export function calculateCoinMGrid(
   const spacingPercent = midPrice > 0 ? (spacing / midPrice) * 100 : 0;
 
   const orders = buildOrders(cells, startBotPrice, direction, botStarted);
-  const { buyOrdersBelow, sellOrdersAbove } = countOrderBookStats(orders, startBotPrice, direction);
+  const buyOrdersBelow = meta.buyBelow;
+  const sellOrdersAbove = meta.sellAbove;
 
   const projectedBtc =
     direction === "long"

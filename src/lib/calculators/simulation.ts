@@ -1,5 +1,5 @@
 import type { GridCell, GridCalculatorInput, MarginInfo, PriceSimulation } from "@/types/calculator";
-import { FUTURES_GRID_DEPLOY_RATIO, gridInvestment, totalWallet } from "@/types/calculator";
+import { totalWallet } from "@/types/calculator";
 import {
   createWalletAtStart,
   type GridWalletState,
@@ -46,19 +46,6 @@ export function calculateLiquidationShort(
   const mmr = maintenanceMarginPercent / 100;
   const liq = (walletBalance + avgEntry * quantity) / (quantity * (1 + mmr));
   return liq;
-}
-
-/** Pionex-style liq estimate: 90% of full leveraged notional deployed at start. */
-export function pionexGridPositionQty(
-  input: Pick<GridCalculatorInput, "margin" | "leverage" | "startBotPrice" | "direction" | "marketType" | "currentPrice">,
-): number {
-  const { startBotPrice, direction } = input;
-  if (startBotPrice <= 0 || direction === "neutral") return 0;
-
-  const investment = gridInvestment(input);
-  if (investment <= 0) return 0;
-
-  return (investment / startBotPrice) * FUTURES_GRID_DEPLOY_RATIO;
 }
 
 function weightedAvgCost(lots: InventoryLot[]): number {
@@ -147,7 +134,7 @@ export function simulatePriceMove(
   const feeRate = feePercent / 100;
   const wallet = createWalletAtStart(input, cells);
 
-  walkPrice(wallet, cells, startBotPrice, toPrice, direction, feeRate, upperPrice);
+  walkPrice(wallet, cells, startBotPrice, toPrice, direction, feeRate, upperPrice, input.leverage);
 
   return walletToSimulation(wallet, input, toPrice);
 }

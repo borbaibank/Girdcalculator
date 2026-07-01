@@ -4,14 +4,18 @@ import type {
   GridCell,
   GridOrder,
 } from "@/types/calculator";
-import { gridInvestment, isBotStarted, totalWallet, FUTURES_GRID_DEPLOY_RATIO } from "@/types/calculator";
+import { gridInvestment, isBotStarted, totalWallet } from "@/types/calculator";
 import { buildPriceLevels } from "@/lib/calculators/price-levels";
 import { buildGridCells } from "@/lib/calculators/grid-cells";
+import {
+  computeUsdtMFuturesAllocation,
+  countGridsAtStart,
+  gridOpenPositionQty,
+} from "@/lib/calculators/usdt-m-allocation";
 import {
   calculateLiquidationLong,
   calculateLiquidationShort,
   calculateMargin,
-  pionexGridPositionQty,
   simulatePriceMove,
   snapshotAtStart,
 } from "@/lib/calculators/simulation";
@@ -61,18 +65,26 @@ export function calculateGrid(
   const spacingPercent = midPrice > 0 ? (spacing / midPrice) * 100 : 0;
 
   const orders = buildOrders(cells, startBotPrice, direction, botStarted);
-  const { buyOrdersBelow, sellOrdersAbove } = countOrderBookStats(
-    orders,
-    startBotPrice,
-    direction,
-  );
+  const gridCounts = countGridsAtStart(priceLevels, gridCount, startBotPrice);
+  const buyOrdersBelow = gridCounts.buyBelow;
+  const sellOrdersAbove = gridCounts.sellAbove;
+  const futuresAlloc =
+    direction === "long" || direction === "short"
+      ? computeUsdtMFuturesAllocation(input, gridCounts)
+      : null;
 
   const holdings = botStarted
-    ? computeInitialHoldings(cells, startBotPrice, quotePerGrid, direction, investment)
+    ? computeInitialHoldings(cells, startBotPrice, quotePerGrid, direction, futuresAlloc)
     : { initialCoin: 0, initialUsdt: investment };
   const { initialCoin, initialUsdt } = holdings;
 
-  const projectedHoldings = computeInitialHoldings(cells, startBotPrice, quotePerGrid, direction, investment);
+  const projectedHoldings = computeInitialHoldings(
+    cells,
+    startBotPrice,
+    quotePerGrid,
+    direction,
+    futuresAlloc,
+  );
   const projectedCoin = projectedHoldings.initialCoin;
   const holdingsAtStart = {
     coin: projectedHoldings.initialCoin,
@@ -88,11 +100,11 @@ export function calculateGrid(
 
   const margin = calculateMargin(projectedCoin, currentPrice, wallet, leverage);
 
-  const pionexQty = pionexGridPositionQty(input);
-  const liqQty =
+  const openQty =
     direction === "long" || direction === "short"
-      ? pionexQty
+      ? gridOpenPositionQty(input, priceLevels)
       : Math.abs(projectedCoin);
+  const liqQty = openQty;
   const avgEntry = liqQty > 0 ? startBotPrice : 0;
 
   let liquidationPriceBase = 0;
@@ -173,40 +185,6 @@ export function calculateGrid(
     liquidationPriceBase,
     investment,
     marginCollateral: input.margin,
-  };
-}
-
-/** Active grid orders relative to start price — direction-aware book counts. */
-function countOrderBookStats(
-  orders: GridOrder[],
-  startPrice: number,
-  direction: GridCalculatorInput["direction"],
-): { buyOrdersBelow: number; sellOrdersAbove: number } {
-  if (direction === "neutral") {
-    return {
-      buyOrdersBelow: orders.filter((o) => o.type === "buy" && o.status === "placed").length,
-      sellOrdersAbove: orders.filter((o) => o.type === "sell" && o.status === "placed").length,
-    };
-  }
-
-  if (direction === "long") {
-    return {
-      buyOrdersBelow: orders.filter(
-        (o) => o.type === "buy" && o.status === "placed" && o.price < startPrice,
-      ).length,
-      sellOrdersAbove: orders.filter(
-        (o) => o.type === "sell" && o.status === "pending" && o.price > startPrice,
-      ).length,
-    };
-  }
-
-  return {
-    buyOrdersBelow: orders.filter(
-      (o) => o.type === "buy" && o.status === "pending" && o.price < startPrice,
-    ).length,
-    sellOrdersAbove: orders.filter(
-      (o) => o.type === "sell" && o.status === "placed" && o.price > startPrice,
-    ).length,
   };
 }
 
@@ -339,20 +317,20 @@ function computeInitialHoldings(
   currentPrice: number,
   quotePerGrid: number,
   direction: GridCalculatorInput["direction"],
-  investment: number,
+  futuresAlloc: ReturnType<typeof computeUsdtMFuturesAllocation> | null,
 ): { initialCoin: number; initialUsdt: number } {
-  if (direction === "long") {
-    const coin =
-      currentPrice > 0 ? (investment / currentPrice) * FUTURES_GRID_DEPLOY_RATIO : 0;
-    return { initialCoin: coin, initialUsdt: 0 };
+  if (direction === "long" && futuresAlloc) {
+    return {
+      initialCoin: futuresAlloc.openQty,
+      initialUsdt: futuresAlloc.freeMargin,
+    };
   }
 
-  if (direction === "short") {
+  if (direction === "short" && futuresAlloc) {
     const coin = cells
       .filter((c) => c.sellPrice > currentPrice)
       .reduce((sum, c) => sum + c.quantity, 0);
-    const usdt = cells.filter((c) => c.buyPrice < currentPrice).length * quotePerGrid;
-    return { initialCoin: -coin, initialUsdt: usdt };
+    return { initialCoin: -coin, initialUsdt: futuresAlloc.freeMargin };
   }
 
   const sellCells = cells.filter((c) => c.sellPrice > currentPrice);
